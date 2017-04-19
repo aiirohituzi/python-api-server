@@ -14,6 +14,12 @@ from rest_framework.views import APIView
 from rest_framework import mixins
 from rest_framework import generics
 
+from django.contrib.auth.models import User
+from snippets.serializers import UserSerializer
+
+from rest_framework import permissions
+from snippets.permissions import IsOwnerOrReadOnly  
+
 ### 기본적인 형태의 클래스 기반 뷰
 # class SnippetList(APIView):  
 #     """
@@ -45,10 +51,14 @@ from rest_framework import generics
 #         return self.create(request, *args, **kwargs)
 
 ### 제네릭 클래스 기반 뷰
-class SnippetList(generics.ListCreateAPIView):  
+class SnippetList(generics.ListCreateAPIView):
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
     queryset = Snippet.objects.all()
     serializer_class = SnippetSerializer
 
+    def perform_create(self, serializer):  
+        serializer.save(owner=self.request.user)
     
 
 
@@ -99,6 +109,21 @@ class SnippetList(generics.ListCreateAPIView):
 #         return self.destroy(request, *args, **kwargs)
 
 ### 제네릭 클래스 기반 뷰
-class SnippetDetail(generics.RetrieveUpdateDestroyAPIView):  
+class SnippetDetail(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
     queryset = Snippet.objects.all()
     serializer_class = SnippetSerializer
+    
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,  
+                          IsOwnerOrReadOnly,)
+
+
+class UserList(generics.ListAPIView):  
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+
+class UserDetail(generics.RetrieveAPIView):  
+    queryset = User.objects.all()
+    serializer_class = UserSerializer

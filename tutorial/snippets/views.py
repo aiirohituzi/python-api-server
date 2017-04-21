@@ -23,6 +23,9 @@ from snippets.permissions import IsOwnerOrReadOnly
 from rest_framework.reverse import reverse
 from rest_framework import renderers
 
+from rest_framework import viewsets
+from rest_framework.decorators import detail_route
+
 ### 기본적인 형태의 클래스 기반 뷰
 # class SnippetList(APIView):  
 #     """
@@ -40,32 +43,7 @@ from rest_framework import renderers
 #             return Response(serializer.data, status=status.HTTP_201_CREATED)
 #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-### mixin클래스를 추가하여 기능들을 손쉽게 조합가능
-# class SnippetList(mixins.ListModelMixin,  
-#                   mixins.CreateModelMixin,
-#                   generics.GenericAPIView):
-#     queryset = Snippet.objects.all()
-#     serializer_class = SnippetSerializer
 
-#     def get(self, request, *args, **kwargs):
-#         return self.list(request, *args, **kwargs)
-
-#     def post(self, request, *args, **kwargs):
-#         return self.create(request, *args, **kwargs)
-
-### 제네릭 클래스 기반 뷰
-class SnippetList(generics.ListCreateAPIView):
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
-
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer
-
-    def perform_create(self, serializer):  
-        serializer.save(owner=self.request.user)
-    
-
-
-### 기본적인 형태의 클래스 기반 뷰
 # class SnippetDetail(APIView):  
 #     """
 #     코드 조각 조회, 업데이트, 삭제
@@ -94,7 +72,20 @@ class SnippetList(generics.ListCreateAPIView):
 #         snippet.delete()
 #         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 ### mixin클래스를 추가하여 기능들을 손쉽게 조합가능
+# class SnippetList(mixins.ListModelMixin,  
+#                   mixins.CreateModelMixin,
+#                   generics.GenericAPIView):
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer
+
+#     def get(self, request, *args, **kwargs):
+#         return self.list(request, *args, **kwargs)
+
+#     def post(self, request, *args, **kwargs):
+#         return self.create(request, *args, **kwargs)
+
 # class SnippetDetail(mixins.RetrieveModelMixin,  
 #                     mixins.UpdateModelMixin,
 #                     mixins.DestroyModelMixin,
@@ -111,25 +102,68 @@ class SnippetList(generics.ListCreateAPIView):
 #     def delete(self, request, *args, **kwargs):
 #         return self.destroy(request, *args, **kwargs)
 
-### 제네릭 클래스 기반 뷰
-class SnippetDetail(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
 
+### 제네릭 클래스 기반 뷰
+# class SnippetList(generics.ListCreateAPIView):
+#     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer
+
+#     def perform_create(self, serializer):  
+#         serializer.save(owner=self.request.user)
+
+# class SnippetDetail(generics.RetrieveUpdateDestroyAPIView):
+#     permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+
+#     queryset = Snippet.objects.all()
+#     serializer_class = SnippetSerializer
+    
+#     permission_classes = (permissions.IsAuthenticatedOrReadOnly,  
+#                           IsOwnerOrReadOnly,)
+
+# class SnippetHighlight(generics.GenericAPIView):  
+#     queryset = Snippet.objects.all()
+#     renderer_classes = (renderers.StaticHTMLRenderer,)
+
+#     def get(self, request, *args, **kwargs):
+#         snippet = self.get_object()
+#         return Response(snippet.highlighted)
+
+# 위의 3개의 뷰를 1개의 뷰셋으로 리팩터링
+class SnippetViewSet(viewsets.ModelViewSet):  
+    """
+    이 뷰셋은 `list`와 `create`, `retrieve`, `update`, 'destroy` 기능을 자동으로 지원합니다
+
+    여기에 `highlight` 기능의 코드만 추가로 작성했습니다
+    """
     queryset = Snippet.objects.all()
     serializer_class = SnippetSerializer
-    
-    permission_classes = (permissions.IsAuthenticatedOrReadOnly,  
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,
                           IsOwnerOrReadOnly,)
 
+    @detail_route(renderer_classes=[renderers.StaticHTMLRenderer])
+    def highlight(self, request, *args, **kwargs):
+        snippet = self.get_object()
+        return Response(snippet.highlighted)
+
+    def perform_create(self, serializer):
+            serializer.save(owner=self.request.user)
 
 
+# class UserList(generics.ListAPIView):  
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
 
-class UserList(generics.ListAPIView):  
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+# class UserDetail(generics.RetrieveAPIView):  
+#     queryset = User.objects.all()
+#     serializer_class = UserSerializer
 
-
-class UserDetail(generics.RetrieveAPIView):  
+# 위의 두 뷰를 뷰셋 하나로 리팩터링
+class UserViewSet(viewsets.ReadOnlyModelViewSet):  
+    """
+    이 뷰셋은 `list`와 `detail` 기능을 자동으로 지원합니다
+    """
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
@@ -140,12 +174,3 @@ def api_root(request, format=None):
         'users': reverse('user-list', request=request, format=format),
         'snippets': reverse('snippet-list', request=request, format=format)
     })
-
-
-class SnippetHighlight(generics.GenericAPIView):  
-    queryset = Snippet.objects.all()
-    renderer_classes = (renderers.StaticHTMLRenderer,)
-
-    def get(self, request, *args, **kwargs):
-        snippet = self.get_object()
-        return Response(snippet.highlighted)
